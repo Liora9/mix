@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>lmc人机 - 彩虹粒子手机专属版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030303;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* 全屏彩虹粒子画布（最底层） */
+        #particleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* 屏幕正中核心区域（中层：大字） */
+        .center-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2; /* 调低图层，让大字在底层 */
+            text-align: center;
+            pointer-events: none;
+            width: 100%;
+            padding: 0 15px;
+        }
+
+        .main-title {
+            font-size: 13vw;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: 2px;
+            white-space: nowrap;
+            animation: colorGlow 3s infinite alternate, floatText 4s ease-in-out infinite;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.8),
+                         0 0 30px rgba(255, 0, 128, 0.8),
+                         0 0 60px rgba(0, 255, 255, 0.8);
+        }
+
+        .sub-title {
+            margin-top: 10px;
+            font-size: 3.8vw;
+            color: #00ffff;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px #00ffff;
+            animation: fadeInOut 2s infinite alternate;
+        }
+
+        /* 弹幕层容器（最顶层：可以挡住大字） */
+        .danmaku-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3; /* 调高图层，让弹幕在最前面 */
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        /* 单条弹幕样式 */
+        .danmaku-item {
+            position: absolute;
+            white-space: nowrap;
+            font-size: 5vw; /* 稍微加粗放大一点点，更有遮挡的视觉冲击力 */
+            font-weight: bold;
+            animation: flyLeft linear infinite;
+            opacity: 0.95;
+        }
+
+        /* 动画关键帧：从右向左飞掠 */
+        @keyframes flyLeft {
+            0% {
+                transform: translateX(100vw);
+            }
+            100% {
+                transform: translateX(-110%);
+            }
+        }
+
+        /* 颜色循环发光 */
+        @keyframes colorGlow {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        /* 浮动呼吸特效 */
+        @keyframes floatText {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 彩虹粒子特效画布 -->
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- 屏幕正中标题（在中间层） -->
+    <div class="center-container">
+        <h1 class="main-title">lmc人机</h1>
+        <div class="sub-title">—— 手机彩虹粒子循环系统 ——</div>
+    </div>
+
+    <!-- 循环流动的弹幕层（提至最顶层，可遮挡大字） -->
+    <div class="danmaku-container" id="danmakuContainer"></div>
+
+    <script>
+        // 1. 彩虹粒子背景逻辑
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let particles = [];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 2.5;
+                this.vy = (Math.random() - 0.5) * 2.5;
+                this.radius = Math.random() * 2.5 + 1;
+                this.hue = Math.random() * 360;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.hue = (this.hue + 1.5) % 360;
+
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${this.hue}, 100%, 60%)`;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = `hsl(${this.hue}, 100%, 60%)`;
+                ctx.fill();
+            }
+        }
+
+        const particleCount = 50;
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, width, height);
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                for (let j = i + 1; j < particles.length; j++) {
+                    let dx = particles[i].x - particles[j].x;
+                    let dy = particles[i].y - particles[j].y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 80) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `hsla(${particles[i].hue}, 100%, 50%, ${1 - dist/80})`;
+                        ctx.lineWidth = 0.4;
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // 2. 循环弹幕生成逻辑
+        const danmakuContainer = document.getElementById('danmakuContainer');
+        const phrases = ["lmc人机", "⚡ lmc人机 ⚡", "🔥 终极lmc人机", "✨ lmc人机循环中", "lmc人机无限流"];
+
+        function createDanmaku() {
+            const item = document.createElement('div');
+            item.className = 'danmaku-item';
+            item.innerText = phrases[Math.floor(Math.random() * phrases.length)];
+            
+            const topPos = Math.random() * 80 + 10;
+            const duration = Math.random() * 3 + 3;
+            const randomHue = Math.random() * 360;
+
+            item.style.top = `${topPos}%`;
+            item.style.animationDuration = `${duration}s`;
+            item.style.color = `hsl(${randomHue}, 100%, 75%)`;
+            item.style.textShadow = `0 0 10px hsl(${randomHue}, 100%, 50%)`;
+
+            danmakuContainer.appendChild(item);
+
+            setTimeout(() => {
+                item.remove();
+            }, duration * 1000);
+        }
+
+        setInterval(createDanmaku, 450);
+    </script>
+</body>
+</html>
